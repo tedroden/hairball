@@ -1,0 +1,18 @@
+.chat-line .name {
+	font-weight: bold;
+	padding-right: 1em;
+}
+
+.chat-line  {
+	border-bottom: solid 1px #dfdfdf;
+}
+
+#chat-log { 
+	height: 400px;
+	width: 400px;
+	overflow: auto;
+}
+
+#chat-input {
+	width: 400px;
+}
