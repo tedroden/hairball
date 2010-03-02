@@ -78,4 +78,4 @@
 			  (handle-404 conn))))
 
 ;; setup the server and our handler
-(http-server::http-server :request-handler 'handle-request :port 9999)
+(http-server::http-server :request-handler 'handle-request)
