@@ -2,12 +2,46 @@
 
   <head>
 	<title>Hairball</title>
+	<style>
+	  .center { text-align: center }
+	  .container { width: 700px; margin: auto;}
+	  .download { font-size: 1.4em; font-family: sans-serif;  }
+	 
+	  A, A:visited { color: black; font-weight: bold; color: #353535 }
+
+	  .gist { font-size: 14px; }
+	  .gist A { font-weight: normal; }
+	</style>
   </head>
   <body>
-	<div style="text-align: center;">
-	  <img src="/images/hairball.png">
-	</div>
-	<div>
-	</div>
+	<div class="container">
+	  <div class="center">
+		<img src="images/hairball.png">
+	  </div>
+
+	  <div>
+		<p>
+		  <code>Hairball</code> is an HTTP server and framework designed for <em>the realtime web</em> written entirely in <code>(common lisp)</code>. 
+		</p>
+		
+		<p>
+		  It doesn't do much, but it does support long polling requests, it's single threaded, and it's fun to use. It's not suitable for making real applications, so if you're thinking of using it for that, you're crazy. One day...
+		</p>
+
+		<div class="center download">
+		  <a href="http://github.com/tedroden/hairball">Download from Github</a>
+		</div>
+
+		<p>
+		  Included along with the framework is a <a href="https://github.com/tedroden/hairball/blob/master/demos/group-chat.lisp">group chat application</a> and a simple hello world (below).
+		</p>
+				
+		<script src="http://gist.github.com/319165.js?file=gistfile1.lisp"></script>
+	  </div>
+
+	  <div class="center">
+		&copy; 2010 <a href="http://tedroden.com">Ted Roden</a> @<a href="http://twitter.com/tedroden">tedroden</a>.
+	  </div>
+	  <div>
   </body>
 </html>
