@@ -12,7 +12,7 @@ C = {
 
 C.login = function() {
 	if(!C.username) {
-		C.username = C.cleanup(prompt("Before you say anything. What\'s your name?"));
+		C.username = prompt("Before you say anything. What\'s your name?");
 		C.send("(joined)", function() {
 				   $('#chat-input').focus();
 			   });
@@ -29,11 +29,6 @@ C.init = function() {
 	C.poll(); // start polling
 };
 
-C.cleanup = function(s) {
-	// can't handle ampersands
-	return s.replace('&', '+');
-};
-
 C.send_chat_input = function(body) {
 	C.send($('#chat-input').val(),
 		   function(data)  { $('#chat-input').val(''); });
@@ -44,7 +39,7 @@ C.send = function(body, callback) {
 		url: "/send",
         type: "GET",
 		data: { 'from': C.username,
-				'body': C.cleanup(body) },
+				'body': body },
         dataType: "text",
 		success: callback
 	});

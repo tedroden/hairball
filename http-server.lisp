@@ -272,25 +272,21 @@ is replaced with replacement."
 			  ;; ahh, end of headers
 			  ((string= line "")
 
-			   ;; fixme: clean this up to be (method-is-get conn)
+			   ;; fixme: clean this up to be something cleaner like (method-is-get conn)
 			   (when (string= "GET" (slot-value conn 'request-method))
-;;				 (format t "GET IS DONE~%")
 				 (funcall (slot-value conn 'handler) conn)
 				 (return))
 
+			   ;; we'll use this when we support post, etc
+			   ;; not used now
 			   (format t "entering body of request~%")
 			   (setq in-body t)
-			   ;; (funcall (slot-value conn 'handler) conn)
-			   ;; (funcall disconnector)
-			   ;; (return)
 			   )
 			  (t
 			   (vector-push-extend line (slot-value conn 'request-headers) )
 			   ))))
       (end-of-file ()
-		(progn 
-		  (format t "end of file!")
-		  (http-networking-cleanup conn))))))
+		(http-networking-cleanup conn)))))
 
 	  
 (defun serve (conn)
