@@ -10,7 +10,7 @@
 
 (defvar *default-http-port* 9021)
 (defvar *socket-listen-ip* #(127 0 0 1))
-(defvar *socket-listen-backlog* 5)
+(defvar *socket-listen-backlog* 500)
 
 (defparameter *http-server-version* "0.0.1")
 
@@ -244,7 +244,7 @@ is replaced with replacement."
 			
 			(cond 
 			  ;; did we find the request line?
-			  ((search " HTTP/1.1" line)
+			  ((search " HTTP/1." line)
 			   (setf (slot-value conn 'request-method) (subseq line 0 (search " " line)))
 			   (setf (slot-value conn 'request-uri) 
 					 (subseq line (+ 1 (search " " line)) (search " HTTP/1.1" line)))
