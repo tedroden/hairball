@@ -5,6 +5,8 @@
 (defvar *socket-listen-ip* #(127 0 0 1))
 (defvar *socket-listen-backlog* 500)
 
+(defvar *octet* '(unsigned-byte 8))
+
 (defparameter *http-server-version* "0.0.1")
 
 (defvar *http-methods* '("OPTIONS" "GET" "HEAD" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
@@ -43,15 +45,6 @@
 	(sb-bsd-sockets::socket-close (slot-value conn 'socket))
 	;; free the conn variable?
 	))
-
-;; based on code at: 
-;; http://cl-cookbook.sourceforge.net/strings.html#process
-(defun split-by-char (string char)
-    (loop for i = 0 then (1+ j)
-          as j = (position char string :start i)
-          collect (subseq string i j)
-          while j))
-
 
 (defun finish-http-response (conn data)
 
@@ -95,11 +88,14 @@
 ;; sevrve a static file ... no prasing at all!
 (defun finish-static-file (conn static-file)
   (format t "printing static file: ~a~%" static-file)
-  (let ((in (open static-file :if-does-not-exist nil :element-type '(unsigned-byte 8))))
+  (let ((in (open static-file :if-does-not-exist nil :element-type *octet*)))
 	(when in 
-	  (loop for byte = (read-byte in nil)
-		   while byte do
-		   (print byte (slot-value conn 'stream))))
+	  (loop with buf = (make-array 1024 :element-type *octet*)
+		   for pos = (read-sequence buf in)
+		   until (zerop pos)
+		   do (write-sequence buf (slot-value conn 'stream) :end pos)
+		   (finish-output (slot-value conn 'stream))))
+  
 	(close in)
 	(http-networking-cleanup conn)))
 
@@ -174,13 +170,15 @@
 
 	  
 (defun serve (conn)
-  (let ((stream (sb-bsd-sockets::socket-make-stream (slot-value conn 'socket) :output t :input t))
+  (let ((stream (sb-bsd-sockets::socket-make-stream (slot-value conn 'socket) 
+				 :output t 
+				 :input t
+				 :element-type *octet*))
+
         (fd (sb-bsd-sockets::socket-file-descriptor (slot-value conn 'socket))))
 
 	(setf (slot-value conn 'stream) stream)
-    (sb-impl::add-fd-handler fd
-                             :input
-                             (make-http-responder conn))))
+    (sb-impl::add-fd-handler fd :input (make-http-responder conn))))
 
 (defun http-server (&key request-handler (port *default-http-port*))
   (let ((socket (make-instance 'sb-bsd-sockets:inet-socket :type :stream :protocol :tcp))
