@@ -7,7 +7,8 @@
 
 ;; handle the HTTP request
 (defun handle-request (conn) 
-  ;; show "Hello Visitor #1" where 1 is the nth connection
+;;  (print "hello")
+(  ;; show "Hello Visitor #1" where 1 is the nth connection
   (finish-http-response conn (format nil "<h1>Hello Visitor #~a</h1>"
 									 (slot-value conn 'id))))
 

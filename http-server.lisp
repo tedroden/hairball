@@ -1,12 +1,5 @@
 ;; based on code I found: http://jsnell.iki.fi/tmp/echo-server.lisp
-
-(require :sb-bsd-sockets)
-
-(defpackage http-server
-  (:use :cl :sb-bsd-sockets)
-  (:export :http-server :http-connection))
-
-(in-package http-server)
+;(in-package "sb-bsd-sockets")
 
 (defvar *default-http-port* 9021)
 (defvar *socket-listen-ip* #(127 0 0 1))
@@ -44,10 +37,10 @@
 
 
 (defun http-networking-cleanup (conn)
-  (let ((fd (socket-file-descriptor (slot-value conn 'socket))))
+  (let ((fd (sb-bsd-sockets::socket-file-descriptor (slot-value conn 'socket))))
 	;;	(format t "~a: http-networking-cleanup~%" (slot-value conn 'id))
 	(sb-impl::invalidate-descriptor fd)
-	(socket-close (slot-value conn 'socket))
+	(sb-bsd-sockets::socket-close (slot-value conn 'socket))
 	;; free the conn variable?
 	))
 
@@ -99,136 +92,27 @@
 	(http-networking-cleanup conn)))
 
 
-;; sevrve a static file
+;; sevrve a static file ... no prasing at all!
 (defun finish-static-file (conn static-file)
   (format t "printing static file: ~a~%" static-file)
-  (let ((in (open static-file :if-does-not-exist nil)))
+  (let ((in (open static-file :if-does-not-exist nil :element-type '(unsigned-byte 8))))
 	(when in 
-	  (loop for line = (read-line in nil)
-		   while line do
-		   (format (slot-value conn 'stream) "~a~%" line)))
+	  (loop for byte = (read-byte in nil)
+		   while byte do
+		   (print byte (slot-value conn 'stream))))
 	(close in)
 	(http-networking-cleanup conn)))
 
+;; (defun finish-static-file (conn static-file)
+;;   (let ((in (open static-file :if-does-not-exist nil :element-type '(unsigned-byte 8))))
+;; 	(let ((buf (make-array 4096 :element-type (stream-element-type in))))
+;; 	  (loop for pos = (read-sequence buf in )
+;; 		 while (plusp pos)
+;; 		 do (write-sequence buf (slot-value conn 'stream) :end pos)))
+;; 	(close in)
+;; 	(http-networking-cleanup conn)))
 
-(defparameter *char-mapping*
-  '(
-	(" " "+")
-	(" " "%20")
-	("!" "%21")
-	("\"" "%22")
-	("#" "%23")
-	("$" "%24")
-	("&" "%26")
-	("'" "%27")
-	("(" "%28")
-	(")" "%29")
-	("*" "%2A")
-	("+" "%2B")
-	("," "%2C")
-	("-" "%2D")
-	("." "%2E")
-	("/" "%2F")
-	("0" "%30")
-	("1" "%31")
-	("2" "%32")
-	("3" "%33")
-	("4" "%34")
-	("5" "%35")
-	("6" "%36")
-	("7" "%37")
-	("8" "%38")
-	("9" "%39")
-	(":" "%3A")
-	(";" "%3B")
-	("<" "%3C")
-	("=" "%3D")
-	(">" "%3E")
-	("?" "%3F")
-	("@" "%40")
-	("A" "%41")
-	("B" "%42")
-	("C" "%43")
-	("D" "%44")
-	("E" "%45")
-	("F" "%46")
-	("G" "%47")
-	("H" "%48")
-	("I" "%49")
-	("J" "%4A")
-	("K" "%4B")
-	("L" "%4C")
-	("M" "%4D")
-	("N" "%4E")
-	("O" "%4F")
-	("P" "%50")
-	("Q" "%51")
-	("R" "%52")
-	("S" "%53")
-	("T" "%54")
-	("U" "%55")
-	("V" "%56")
-	("W" "%57")
-	("X" "%58")
-	("Y" "%59")
-	("Z" "%5A")
-	("[" "%5B")
-	("\\" "%5C")
-	("]" "%5D")
-	("^" "%5E")
-	("_" "%5F")
-	("`" "%60")
-	("a" "%61")
-	("b" "%62")
-	("c" "%63")
-	("d" "%64")
-	("e" "%65")
-	("f" "%66")
-	("g" "%67")
-	("h" "%68")
-	("i" "%69")
-	("j" "%6A")
-	("k" "%6B")
-	("l" "%6C")
-	("m" "%6D")
-	("n" "%6E")
-	("o" "%6F")
-	("p" "%70")
-	("q" "%71")
-	("r" "%72")
-	("s" "%73")
-	("t" "%74")
-	("u" "%75")
-	("v" "%76")
-	("w" "%77")
-	("x" "%78")
-	("y" "%79")
-	("z" "%7A")
-	("{" "%7B")
-	("|" "%7C")
-	("}" "%7D")
-	("~" "%7E")))
 
-(defun replace-all (string part replacement &key (test #'char=))
-"Returns a new string in which all the occurences of the part 
-is replaced with replacement."
-    (with-output-to-string (out)
-      (loop with part-length = (length part)
-            for old-pos = 0 then (+ pos part-length)
-            for pos = (search part string
-                              :start2 old-pos
-                              :test test)
-            do (write-string string out
-                             :start old-pos
-                             :end (or pos (length string)))
-            when pos do (write-string replacement out)
-            while pos))) 
-
-;; FIXME: make me work and move me
-(defun urldecode (str) 
-  (dolist (map *char-mapping*)
-	(setq str (replace-all str (car (cdr map)) (car map) :test 'equal)))
-  str)
 
 ;; this if hte first http responder. we want to wait for the theaders
 (defun make-http-responder (conn)
@@ -290,8 +174,8 @@ is replaced with replacement."
 
 	  
 (defun serve (conn)
-  (let ((stream (socket-make-stream (slot-value conn 'socket) :output t :input t))
-        (fd (socket-file-descriptor (slot-value conn 'socket))))
+  (let ((stream (sb-bsd-sockets::socket-make-stream (slot-value conn 'socket) :output t :input t))
+        (fd (sb-bsd-sockets::socket-file-descriptor (slot-value conn 'socket))))
 
 	(setf (slot-value conn 'stream) stream)
     (sb-impl::add-fd-handler fd
@@ -299,19 +183,19 @@ is replaced with replacement."
                              (make-http-responder conn))))
 
 (defun http-server (&key request-handler (port *default-http-port*))
-  (let ((socket (make-instance 'inet-socket :type :stream :protocol :tcp))
+  (let ((socket (make-instance 'sb-bsd-sockets:inet-socket :type :stream :protocol :tcp))
         (counter 0))
 	(format t "Using port ~a~%" port)
-    (socket-bind socket *socket-listen-ip* port)
-    (socket-listen socket *socket-listen-backlog*)
+    (sb-bsd-sockets::socket-bind socket *socket-listen-ip* port)
+    (sb-bsd-sockets::socket-listen socket *socket-listen-backlog*)
 	(format t "Server Running...~%")
-    (sb-impl::add-fd-handler (socket-file-descriptor socket)
+    (sb-impl::add-fd-handler (sb-bsd-sockets::socket-file-descriptor socket)
                              :input
                              (lambda (_)
                                (declare (ignore _))
 							   (setf (sb-bsd-sockets:non-blocking-mode socket) t)
                                (incf counter)
 ;;                               (format t "Accepted client ~A~%" counter)
-                               (serve (make-instance 'http-connection :socket (socket-accept socket) :id counter :handler request-handler))))))
+                               (serve (make-instance 'http-connection :socket (sb-bsd-sockets::socket-accept socket) :id counter :handler request-handler))))))
 
 (provide 'http-server)

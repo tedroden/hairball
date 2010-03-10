@@ -4,8 +4,20 @@
 ;; then point your browser(s) to http://localhost:9021
 ;;
 
-(require "http-server.lisp" "../http-server.lisp")
-(in-package :http-server)
+(require :asdf)
+
+(setf asdf:*central-registry*
+   ;; Default directories, usually just the ``current directory''
+  '(*default-pathname-defaults*
+
+    ;; Additional places where ASDF can find
+    ;; system definition files
+    #p"/Users/troden/Dropbox/Documents/Code/hairball/"))
+
+(asdf:oos 'asdf:load-op 'hairball)
+; (in-package 'hairball)
+
+
 (defvar *listeners* (make-array 0
 								:element-type 'standard-class
 								:fill-pointer 0
@@ -67,7 +79,7 @@
 
 		;; fixme: there must be a better way to get the last/second item 
 		;; (cdr returns the rest)
-		(funcall (car (cdr map)) conn)
+		(funcall (second map) conn)
 		
 		(setq handled t)
 		(return)))
