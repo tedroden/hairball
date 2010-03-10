@@ -120,4 +120,12 @@ is replaced with replacement."
 	(setq str (replace-all str (second map) (car map) :test 'equal)))
   str)
 
+;; based on code at: 
+;; http://cl-cookbook.sourceforge.net/strings.html#process
+(defun split-by-char (string char)
+    (loop for i = 0 then (1+ j)
+          as j = (position char string :start i)
+          collect (subseq string i j)
+          while j))
+
 (provide 'hairball-utils)
