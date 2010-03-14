@@ -4,19 +4,10 @@
 ;; then point your browser(s) to http://localhost:9021
 ;;
 
+;; load the hairbal library
 (require :asdf)
-
-(setf asdf:*central-registry*
-   ;; Default directories, usually just the ``current directory''
-  '(*default-pathname-defaults*
-
-    ;; Additional places where ASDF can find
-    ;; system definition files
-    #p"/Users/troden/Dropbox/Documents/Code/hairball/"))
-
+(setf asdf:*central-registry* '(*default-pathname-defaults* #p"../"))
 (asdf:oos 'asdf:load-op 'hairball)
-; (in-package 'hairball)
-
 
 (defvar *listeners* (make-array 0
 								:element-type 'standard-class
@@ -89,5 +80,5 @@
 	  (format t "Handling 404")
 			  (handle-404 conn))))
 
-;; setup the server and our handler
+;; setup the server and our handlersh
 (http-server :request-handler 'handle-request)
