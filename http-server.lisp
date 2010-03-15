@@ -199,8 +199,8 @@
 					(setf (gethash key (slot-value conn 'get-params)) 
 						  (urldecode value))))))))
 
-	  (format t "request-method: ~a~%" (slot-value conn 'request-method))
-	  (format t "request-uri: ~a~%" (slot-value conn 'request-uri))
+	  ;; (format t "request-method: ~a~%" (slot-value conn 'request-method))
+	  ;; (format t "request-uri: ~a~%" (slot-value conn 'request-uri))
 
 	  ;; ;; dump parameters
 	  ;; (loop for k being the hash-key using (hash-value v) of (slot-value conn 'get-params)
