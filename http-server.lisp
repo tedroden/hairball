@@ -7,12 +7,6 @@
 (defvar *read-buffer-size* 8)
 (defvar *octet* '(unsigned-byte 8))
 
-;; ;; from hunchentoot
-;; (defvar *crlf*
-;;   (make-array 2 :element-type '(unsigned-byte 8)
-;;               :initial-contents (mapcar 'char-code '(#\Return #\Linefeed))))
-
-
 (defparameter *http-server-version* "0.0.1")
 
 (defvar *http-methods* '("OPTIONS" "GET" "HEAD" "POST" "PUT" "DELETE" "TRACE" "CONNECT"))
@@ -31,18 +25,18 @@
    (get-params :accessor get-params :initform (make-hash-table :test 'equal))
    (request-uri :accessor request-uri)
    (request-method :accessor request-method)
-   (request-headers :initform (make-array 0 
-										   :element-type 'string
-										   :fill-pointer 0
-										   :adjustable t)
+   (request-headers :initform (make-hash-table)
 					:accessor request-headers)
-   (response-headers :initform (make-array 0 
-										   :element-type 'string
-										   :fill-pointer 0
-										   :adjustable t))
+   (response-headers :initform (make-hash-table))
 
    ))
 
+
+(defmethod response-headers ((x http-connection))
+  (slot-value x 'response-headers))
+
+(defmacro response-header (conn header)
+  `(gethash ,header (response-headers ,conn)))
 
 (defun http-networking-cleanup (conn)
   (let ((fd (sb-bsd-sockets::socket-file-descriptor (slot-value conn 'socket))))
@@ -57,35 +51,35 @@
   ;; we we still connected?
   (when (sb-bsd-sockets:socket-open-p (slot-value conn 'socket))
 
-	;; fixme: is this a 200 response?
-	(vector-push-extend (format nil "HTTP/1.1 200 OK") (slot-value conn 'response-headers))
-
 	(multiple-value-bind
 		  (second minute hour date month year day-of-week dst-p tz)
 		(get-decoded-time)
-	  (format nil "~a" dst-p)
-	  (vector-push-extend
-	   (format nil "Date: ~a, ~d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT~@d" 
-			   (nth day-of-week *short-day-names*) 
-			   date 
-			   (nth month *short-month-names*)
-			   year
-			   hour minute second
-			   (- tz)) (slot-value conn 'response-headers)))
+	  (declare (ignore dst-p))
+	  (setf (response-header conn "Date")
+			(format nil "Date: ~a, ~d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT~@d" 
+					(nth day-of-week *short-day-names*) 
+					date 
+					(nth month *short-month-names*)
+					year
+					hour minute second
+					(- tz))))
 	
-	(vector-push-extend 
-	 (format nil "Server: Hairball/~a" *http-server-version*) 
-	 (slot-value conn 'response-headers))
+	
+	(setf (response-header conn "Server") 
+		  (format nil "Server: Hairball/~a" *http-server-version*))
 
-	(vector-push-extend 
-	 "X-Powered-By: Rolaids, coffee, and beer" 
-	 (slot-value conn 'response-headers))
+	(setf (response-header conn "X-Powered-By")
+		  "X-Powered-By: Rolaids, coffee, and beer")
 
+	;; print the response header
+	;; FIXME: why is this 200? Could be a 404 or something, right?
+	(format (slot-value conn 'stream) "HTTP/1.0 200 OK~%")
+	
 	;; print the headers
-	(loop 
-	   for header across (slot-value conn 'response-headers)
-	   do (format (slot-value conn 'stream) "~a~%" header))
-
+	(loop for k being the hash-key using (hash-value v) of (response-headers conn)
+	  	   do (format (slot-value conn 'stream) "~a: ~a~%" k v))
+	
+	;; print the data
 	(format (slot-value conn 'stream) "~%~a" data)
 
 	(http-networking-cleanup conn)))
@@ -94,9 +88,9 @@
 ;; sevrve a static file ... no prasing at all!
 (defun finish-static-file (conn static-file)
   (format t "printing static file: ~a~%" static-file)
-  (let ((in (open static-file :if-does-not-exist nil :element-type *octet*)))
+  (let ((in (open static-file :if-does-not-exist nil :element-type 'character)))
 	(when in 
-	  (loop with buf = (make-array 1024 :element-type *octet*)
+	  (loop with buf = (make-array 1024 :element-type 'character)
 		   for pos = (read-sequence buf in)
 		   until (zerop pos)
 		   do (write-sequence buf (slot-value conn 'stream) :end pos)
@@ -115,92 +109,18 @@
 ;; 	(http-networking-cleanup conn)))
 
 
-
-;; this if hte first http responder. we want to wait for the theaders
-;; (defun make-http-responder (conn)
-;;   (lambda (_)
-;;     (declare (ignore _))
-;;     (handler-case
-;; 		(loop
-;; 		  (let ((line (read-line (slot-value conn 'stream)))
-;; 				(in-body nil))
-			
-;; 			;; FIXME: we know the http method/version is on the frist line. get it there.
-;; 			(setf line (subseq line 0 (1- (length line))))
-			
-;; 			(cond 
-;; 			  ;; did we find the request line?
-;; 			  ((search " HTTP/1." line)
-;; 			   (setf (slot-value conn 'request-method) (subseq line 0 (search " " line)))
-;; 			   (setf (slot-value conn 'request-uri) 
-;; 					 (subseq line (+ 1 (search " " line)) (search " HTTP/1.1" line)))
-
-;; 			   ;; get the GET request parameters
-;; 			   (let ((uri (slot-value conn 'request-uri)))
-;; 				 (if (search "?" uri)
-;; 					 (let ((key-values (split-by-char 
-;; 										(subseq uri (+ 1 (search "?" uri))) 
-;; 										#\&)))
-;; 					   ;; we have the "x=y" and "z=hello+mom+let's+eat+cheese"
-;; 					   ;; turn those into parameters
-;; 					   (dolist (x key-values)
-;; 						 (let ((key   (subseq x 0 (search "=" x)))
-;; 							   (value (subseq x (+ 1 (search "=" x)) (length x))))
-;; 						   (setf (gethash key (slot-value conn 'get-params)) 
-;; 								 (urldecode value)))))))
-
-;; 			   ) ;; should match up to ((search " HTTP ...
-
-;; 			  ;; do we know? are we in the body?
-;; 			  (in-body
-;; 			   (format t "body: '~a'~%" line))
-
-;; 			  ;; ahh, end of headers
-;; 			  ((string= line "")
-
-;; 			   ;; fixme: clean this up to be something cleaner like (method-is-get conn)
-;; 			   (when (string= "GET" (slot-value conn 'request-method))
-;; 				 (funcall (slot-value conn 'handler) conn)
-;; 				 (return))
-
-;; 			   ;; we'll use this when we support post, etc
-;; 			   ;; not used now
-;; 			   (format t "entering body of request~%")
-;; 			   (setq in-body t)
-;; 			   )
-;; 			  (t
-;; 			   (vector-push-extend line (slot-value conn 'request-headers) )
-;; 			   ))))
-;;       (end-of-file ()
-;; 		(http-networking-cleanup conn)))))
-
-(defun hairball-readline (conn)
-  (with-output-to-string (out)
-	(let ((sock (slot-value conn 'socket))
-		  (buffer (make-array *read-buffer-size*
-							:element-type 'character
-							:adjustable nil
-							:fill-pointer t)))
-	  (setf (fill-pointer buffer) *read-buffer-size*)
-	  (do ((done nil))
-		  (done t)
-		(multiple-value-bind (buf len raddr)
-			(sb-bsd-sockets:socket-receive sock buffer nil)
-		  (format t "Recved ~a bytes" len)
-		  (format t buffer))))))
-  
-
-(defun make-http-responder (conn)
-  (lambda (_)
-    (declare (ignore _))
+(defun hairball-get-headers (conn)
 	;; get the request and headers...
 	(with-output-to-string (out)
-
+;	  (set 'request-string "")
 	  (let ((sock (slot-value conn 'socket))
+			(request-string "")
+			(final-headers (make-hash-table))
 			(headers (make-array 0 
 								:element-type 'string
 								:fill-pointer 0
 								:adjustable t))
+
 			(current-header (make-array 0
 										:element-type 'character
 										:fill-pointer 0
@@ -215,61 +135,84 @@
 			(done t)
 		  (multiple-value-bind (buf len raddr)
 			  (sb-bsd-sockets:socket-receive sock buffer nil)
-;;			(declare (ignore raddr))
-			
+			(declare (ignore len))
+			(declare (ignore raddr))
 			(loop 
 			   for char across buf
-			   do (if (equal #\Newline char)
-					  (let ((trimmed-header (string-right-trim '(#\Space #\Tab #\Newline #\Return #\Linefeed) current-header))) 
-						
-						(if (= 0 (length trimmed-header))
-							(progn 
-							  (format t "DONE!!!!!!~%")
-							  (princ headers)
-							  (return headers)))
-						
+
+			   do 
+				 (if (equal #\Newline char)
+					  (let ((trimmed-header (string-trim '(#\Space #\Tab #\Newline #\Return #\Linefeed) current-header)))
+						(progn
+						  ;; if we have an empty header, we're dont with headers
+						  (if (= 0 (length trimmed-header))
+							  (progn 
+								(loop for header across headers
+								   do (let ((h (string header)))
+										(setf (gethash (subseq h 0 (search ": " h)) final-headers) 
+											  (subseq h (+ 2 (search ": " h))))))
+							  
+								(return-from hairball-get-headers (values request-string final-headers))))
 							
-						;; FIXME: there has to be a better way
-						;;        to copy a string onto the array
-						(vector-push-extend (format nil "~a" trimmed-header) headers)
+						  ;; Do we have the request string yet?
+						  (if (not (plusp (length request-string)))
+							  (progn 
+								(setf request-string (copy-seq current-header))
+								(setf (fill-pointer current-header) 0))
+							  
+							  ;; otherwise, we have the request string, setup this header
+							  (progn 
+								(vector-push-extend (copy-seq trimmed-header) headers)
+								(setf (fill-pointer current-header) 0)))))
 						
-						(setf (fill-pointer current-header) 0))
-					  (progn 
-						(if (not (equal #\Linefeed char))
-							(vector-push-extend char current-header)))))
+					  ;; othwerise we're not a newline... FIXME: remove this newline check?
+					  (if (not (equal #\Return char)) 
+						  (vector-push-extend char current-header)))
 
 			))))))
-
   
+(defun make-http-responder (conn)
+ (lambda (_)
+   (declare (ignore _))
 
-  
-;;   (let ((buffer (make-array *read-buffer-size*
-;; 							:element-type 'character
-;; 							:adjustable nil
-;; 							:fill-pointer t))
-;;         (sock (slot-value conn 'socket)))
+	;; get the request and headers...
+	(multiple-value-bind (rs headers)
+		(hairball-get-headers conn)
 
-;; 	(do ((fin nil))
-;; 		(fin t)
+	  (setf (slot-value conn 'request-method) (subseq rs 0 (search " " rs)))
+	  (setf (slot-value conn 'request-uri) 
+			(subseq rs (+ 1 (search " " rs)) (+ 1 (search " HTTP/1." rs))))
+	  (setf (slot-value conn 'request-headers) headers)
 
-;; 	  (setf (fill-pointer buffer) *read-buffer-size*)
-;;       (multiple-value-bind (buf len raddr)
-;;           (sb-bsd-sockets:socket-receive sock buffer nil)
-;;         (declare (ignore raddr))
-;;         (if (null buf)
-;;             (setf fin t)
-;;             (setf (fill-pointer buffer) len)))
-;;       (cond ((= (length buffer) 0)
-;;              (format t "  Got 0 bytes, closing socket and removing handler~%")
-;;              (sb-bsd-sockets:socket-close sock)
-;; ;             (sb-sys:remove-fd-handler (server-session-handler session))
-;;              (setf fin t))
-;;             (fin (format t "Got NIL, returning~%"))
-;;             (t
-;;              (format t "  Read ~a bytes: ~a~%" (length buffer) buffer))))))
+	  (when (string= "GET" (slot-value conn 'request-method))
+		;; get the GET request parameters
+		(let ((uri (slot-value conn 'request-uri)))
+		  (if (search "?" uri)
+			  (let ((key-values (split-by-char 
+								 (subseq uri (+ 1 (search "?" uri))) 
+								 #\&)))
+				;; we have the "x=y" and "z=hello+mom+let's+eat+cheese"
+				;; turn those into parameters
+				(dolist (x key-values)
+				  (let ((key   (subseq x 0 (search "=" x)))
+						(value (subseq x (+ 1 (search "=" x)) (length x))))
+					(setf (gethash key (slot-value conn 'get-params)) 
+						  (urldecode value))))))))
 
+	  (format t "request-method: ~a~%" (slot-value conn 'request-method))
+	  (format t "request-uri: ~a~%" (slot-value conn 'request-uri))
 
+	  ;; ;; dump parameters
+	  ;; (loop for k being the hash-key using (hash-value v) of (slot-value conn 'get-params)
+	  ;; 	   do (format t "-- ~a => ~a~%" k v))
 	  
+	  ;; ;; dump headers
+	  ;; (loop for k being the hash-key using (hash-value v) of (slot-value conn 'request-headers)
+	  ;; 	   do (format t "-- ~a => ~a~%" k v))
+
+	  (when (string= "GET" (slot-value conn 'request-method))
+		(funcall (slot-value conn 'handler) conn)))))
+
 (defun serve (conn)
   (let ((stream (sb-bsd-sockets::socket-make-stream (slot-value conn 'socket) 
 				 :output t 
