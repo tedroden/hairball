@@ -20,6 +20,8 @@
 	("/send"    handle-send)
 	("/js"      handle-static-js)
 	("/css"     handle-static-css)
+	("/image"   handle-static-image)
+	("/hello"   handle-static-hello)
 	("/"        handle-static-home)))
 
 
@@ -60,6 +62,13 @@
 (defun handle-static-css (conn)
   (finish-static-file conn "static/group-chat.css"))
 
+(defun handle-static-image (conn)
+  (finish-static-file conn "static/hairball-image-fancy.png"))
+
+(defun handle-static-hello (conn)
+  (finish-static-file conn "static/hello-world.html"))
+
+
 (defun handle-request (conn) 
   (let ((handled nil))
 
@@ -78,6 +87,7 @@
 	;; FIXME: i don't think we should have to keep track of this here.
 	(when (not handled)
 	  (format t "Handling 404")
+
 			  (handle-404 conn))))
 
 ;; setup the server and our handlersh
