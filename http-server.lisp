@@ -32,6 +32,9 @@
    ))
 
 
+
+
+
 (defmethod response-headers ((x http-connection))
   (slot-value x 'response-headers))
 
@@ -45,6 +48,9 @@
 	(sb-bsd-sockets::socket-close (slot-value conn 'socket))
 	;; free the conn variable?
 	))
+
+(defun write-string-to-client (conn str)
+  (write-sequence (sb-ext:string-to-octets str) (slot-value conn 'stream)))
 
 (defun finish-http-response (conn data)
 
@@ -73,14 +79,14 @@
 
 	;; print the response header
 	;; FIXME: why is this 200? Could be a 404 or something, right?
-	(format (slot-value conn 'stream) "HTTP/1.0 200 OK~%")
-	
+	(write-string-to-client conn  "HTTP/1.0 200 OK~%")
+
 	;; print the headers
 	(loop for k being the hash-key using (hash-value v) of (response-headers conn)
-	  	   do (format (slot-value conn 'stream) "~a: ~a~%" k v))
+	  	   do (write-string-to-client conn (format nil "~a: ~a~%" k v)))
 	
 	;; print the data
-	(format (slot-value conn 'stream) "~%~a" data)
+	(write-string-to-client conn (format nil "~%~a" data))
 
 	(http-networking-cleanup conn)))
 
@@ -88,9 +94,9 @@
 ;; sevrve a static file ... no prasing at all!
 (defun finish-static-file (conn static-file)
   (format t "printing static file: ~a~%" static-file)
-  (let ((in (open static-file :if-does-not-exist nil :element-type 'character)))
+  (let ((in (open static-file :if-does-not-exist nil :element-type *octet*)))
 	(when in 
-	  (loop with buf = (make-array 1024 :element-type 'character)
+	  (loop with buf = (make-array 1024 :element-type *octet*)
 		   for pos = (read-sequence buf in)
 		   until (zerop pos)
 		   do (write-sequence buf (slot-value conn 'stream) :end pos)
@@ -99,15 +105,6 @@
 	(close in)
 	(http-networking-cleanup conn)))
 
-;; (defun finish-static-file (conn static-file)
-;;   (let ((in (open static-file :if-does-not-exist nil :element-type '(unsigned-byte 8))))
-;; 	(let ((buf (make-array 4096 :element-type (stream-element-type in))))
-;; 	  (loop for pos = (read-sequence buf in )
-;; 		 while (plusp pos)
-;; 		 do (write-sequence buf (slot-value conn 'stream) :end pos)))
-;; 	(close in)
-;; 	(http-networking-cleanup conn)))
-
 
 (defun hairball-get-headers (conn)
 	;; get the request and headers...
@@ -115,6 +112,7 @@
 ;	  (set 'request-string "")
 	  (let ((sock (slot-value conn 'socket))
 			(request-string "")
+			(char)
 			(final-headers (make-hash-table))
 			(headers (make-array 0 
 								:element-type 'string
@@ -126,7 +124,7 @@
 										:fill-pointer 0
 										:adjustable t))
 			(buffer (make-array *read-buffer-size*
-								:element-type 'character
+								:element-type  *octet* ;;'character
 								:adjustable nil
 								:fill-pointer t)))
 
@@ -138,9 +136,10 @@
 			(declare (ignore len))
 			(declare (ignore raddr))
 			(loop 
-			   for char across buf
-
+			   for byte across buf
 			   do 
+				 (setq char (code-char byte))		
+
 				 (if (equal #\Newline char)
 					  (let ((trimmed-header (string-trim '(#\Space #\Tab #\Newline #\Return #\Linefeed) current-header)))
 						(progn
@@ -217,7 +216,7 @@
   (let ((stream (sb-bsd-sockets::socket-make-stream (slot-value conn 'socket) 
 				 :output t 
 				 :input t
-				 :element-type 'character
+				 :element-type *octet* ;; 'character
 				 :buffering :none
 				 ))
 ;;				 :element-type *octet*))
