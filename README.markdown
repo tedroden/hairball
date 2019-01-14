@@ -26,7 +26,7 @@ As I type this, there is a live demo of the chat application available at [bit.l
  
 ## Author
 
-This was created by [Ted Roden](http://tedroden.com) (on twitter [@tedroden](http://twitter.com/tedroden)).
+This was created by Ted Roden (on twitter [@tedroden](http://twitter.com/tedroden)).
 
 I started it as a break after writing [Building the Realtime User Experience](http://bit.ly/realtimebook) and as a project to kickstart my learning of lisp.
 
