@@ -20,9 +20,6 @@ To test it out:
  - enter this: `(load "group-chat")`
  - Point your browser to http://localhost:9021 and chat with yourself
 
-## Live Demo
-
-As I type this, there is a live demo of the chat application available at [bit.ly/hairballdemo](http://bit.ly/hairballdemo). I'll try to keep up and running.
  
 ## Author
 
