@@ -79,7 +79,7 @@
 
 	;; print the response header
 	;; FIXME: why is this 200? Could be a 404 or something, right?
-	(write-string-to-client conn  "HTTP/1.0 200 OK~%")
+	(write-string-to-client conn  "HTTP/1.1 200 OK~%")
 
 	;; print the headers
 	(loop for k being the hash-key using (hash-value v) of (response-headers conn)
@@ -94,6 +94,7 @@
 ;; sevrve a static file ... no prasing at all!
 (defun finish-static-file (conn static-file)
   (format t "printing static file: ~a~%" static-file)
+  (write-string-to-client conn  "HTTP/1.1 200 OK~%")  
   (let ((in (open static-file :if-does-not-exist nil :element-type *octet*)))
 	(when in 
 	  (loop with buf = (make-array 1024 :element-type *octet*)
